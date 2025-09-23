@@ -1,0 +1,6 @@
+classes = [
+	{ name = "Body Armor", id = "chest" },
+]
+items = [
+	{ name = "Warlord Cuirass", class = "chest", stats = [{ armour = 445 }], character_level = 80, implicits = [{ affix = "armor-ele-dmg", range = [15, 25] }]},
+]
