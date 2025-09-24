@@ -1,8 +1,8 @@
 use crate::{
     crafting::affix_candidate::AffixCandidate,
     datasets::{
-        affix_tier::AffixTier, class_tier::ClassTier, craft_outcome::CraftOutcome, item::Item,
-        modifiers::Modifiers,
+        affix_tier::AffixTier, class_tier::ClassTier, craft_action::CraftAction,
+        craft_outcome::CraftOutcome, item::Item, modifiers::Modifiers,
     },
     items::{item_state::ItemState, modifier::Modifier},
 };
@@ -126,7 +126,7 @@ pub trait Crafter {
         item_state: &mut ItemState,
         affix_type: &str,
         count: i32,
-    ) {
+    ) -> bool {
         let current_affixes = [item_state.prefixes.clone(), item_state.suffixes.clone()].concat();
 
         let affix_list = match affix_type {
@@ -134,7 +134,7 @@ pub trait Crafter {
             "suffix" => &mut item_state.suffixes,
             _ => {
                 log_debug!("Error: Invalid affix type");
-                return;
+                return false;
             }
         };
 
@@ -152,7 +152,7 @@ pub trait Crafter {
         for _ in 0..count {
             if affix_list.len() as u8 >= max_affixes {
                 log_debug!("Cannot add {}. Maximum affixes reached.", affix_type);
-                return;
+                return false;
             }
 
             let possible_affixes = self.get_possible_affixes(
@@ -164,7 +164,7 @@ pub trait Crafter {
 
             if possible_affixes.is_empty() {
                 log_debug!("No possible {} found for this item.", affix_type);
-                return;
+                return false;
             }
 
             if let Some(affix) =
@@ -174,29 +174,38 @@ pub trait Crafter {
                 affix_list.push(affix);
             }
         }
+
+        true
     }
 
     /// Removes a random affix from `item_state`.
-    fn remove_random_affix(&self, item_state: &mut ItemState, affix_type: &str, count: i32) {
+    fn remove_random_affix(
+        &self,
+        item_state: &mut ItemState,
+        affix_type: &str,
+        count: i32,
+    ) -> bool {
         let affix_list = match affix_type {
             "prefix" => &mut item_state.prefixes,
             "suffix" => &mut item_state.suffixes,
             _ => {
                 log_debug!("Error: Invalid affix type");
-                return;
+                return false;
             }
         };
 
         for _ in 0..count {
             if affix_list.is_empty() {
                 log_debug!("No {} to remove.", affix_type);
-                return;
+                return false;
             }
 
             let mut rng = rand::rng();
             let removed_affix = affix_list.swap_remove(rng.random_range(0..affix_list.len()));
             log_debug!("Removed {}: {}", affix_type, removed_affix.name);
         }
+
+        true
     }
 
     /// Gets an affix ("prefix" or "suffix") from `outcome`.
@@ -210,10 +219,24 @@ pub trait Crafter {
             ""
         } else if (item_state.has_max_prefixes() && is_random_add)
             || (item_state.has_no_prefixes() && is_random_remove)
+            || (item_state.has_targeted_suffixes()
+                && !item_state.has_max_suffixes()
+                && is_random_add)
+            || (item_state.has_targeted_suffixes()
+                && !item_state.has_no_suffixes()
+                && is_random_remove)
+            || (item_state.prefixes.len() == 1 && item_state.has_no_suffixes() && is_random_add)
         {
             "suffix"
         } else if (item_state.has_max_suffixes() && is_random_add)
             || (item_state.has_no_suffixes() && is_random_remove)
+            || (item_state.has_targeted_prefixes()
+                && !item_state.has_max_prefixes()
+                && is_random_add)
+            || (item_state.has_targeted_prefixes()
+                && !item_state.has_no_prefixes()
+                && is_random_remove)
+            || (item_state.suffixes.len() == 1 && item_state.has_no_prefixes() && is_random_add)
         {
             "prefix"
         } else {
@@ -244,5 +267,55 @@ pub trait Crafter {
             .find(|a| a.affix.eq(&affix))
             .map(|a| a.get_value_tier(value).unwrap_or_default())
             .unwrap_or_default()
+    }
+
+    /// Determines if the `action` is a valid action given the current `item`.
+    fn is_valid_crafting_action(&self, action: &CraftAction, item: &ItemState) -> bool {
+        let can_add_prefix = action.only_adds_prefix() && !item.has_max_prefixes();
+        let can_add_suffix = action.only_adds_suffix() && !item.has_max_suffixes();
+        let can_remove_prefix = action.only_removes_prefix() && !item.has_no_prefixes();
+        let can_remove_suffix = action.only_removes_suffix() && !item.has_no_suffixes();
+        let can_add_affix = action.adds_affix() && !item.has_max_affixes();
+        let can_remove_affix = action.removes_affix() && !item.has_no_affixes();
+        let can_replace_affix = action.replaces_affix() && !item.has_no_affixes();
+        let can_target_affix =
+            (action.targets_affix() || action.targets_lowest_tier()) && !item.has_no_affixes();
+        let can_target_prefix = action.only_targets_prefix()
+            && !item.has_no_prefixes()
+            && !item.has_targeted_prefixes();
+        let can_target_suffix = action.only_targets_suffix()
+            && !item.has_no_suffixes()
+            && !item.has_targeted_suffixes();
+        let is_expected_next_action = action.targets_affix()
+            || (!item.has_next_action()
+                || (item.has_next_action() && item.get_next_actions().contains(&action.id)));
+        let can_apply_without_impacting_rarity = !action.id.eq("alteration")
+            || (item.get_affix_count() < 2 && !action.id.eq("alteration"));
+        let meets_item_rarity = if action.rarity.is_some() {
+            action.rarity.clone().unwrap().eq(&item.rarity)
+        } else {
+            true
+        };
+
+        meets_item_rarity
+            && can_apply_without_impacting_rarity
+            && is_expected_next_action
+            && (can_add_prefix
+                || can_add_suffix
+                || can_remove_prefix
+                || can_remove_suffix
+                || can_add_affix
+                || can_remove_affix
+                || can_replace_affix
+                || can_target_affix
+                || can_target_prefix
+                || can_target_suffix)
+    }
+
+    /// Resets an item's targets, if they have been used.
+    fn reset_item_target_action(&self, item: &mut ItemState, action: &str) {
+        if item.has_next_action() {
+            item.clear_next_action(action.to_owned());
+        }
     }
 }

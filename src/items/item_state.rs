@@ -13,6 +13,10 @@ pub struct ItemState {
     pub item_level: u8,
     pub prefixes: Vec<Modifier>,
     pub suffixes: Vec<Modifier>,
+    pub prefixes_targeted: bool,
+    pub suffixes_targeted: bool,
+    pub lowest_tier_targeted: bool,
+    pub next_actions: Option<Vec<String>>,
     // TODO: add a field for active Omens
 }
 
@@ -33,6 +37,10 @@ impl ItemState {
             item_level,
             prefixes,
             suffixes,
+            prefixes_targeted: false,
+            suffixes_targeted: false,
+            lowest_tier_targeted: false,
+            next_actions: None,
         }
     }
 
@@ -96,18 +104,73 @@ impl ItemState {
                 .into_iter()
                 .any(|target_affix| self.meets_modifier(suffix, &target_affix))
         }));
-        HashMap::from([
-            if !good_prefixes.is_empty() {
-                ("prefix".to_owned(), good_prefixes)
-            } else {
-                ("".to_owned(), Vec::<Modifier>::new())
-            },
-            if !good_suffixes.is_empty() {
-                ("suffix".to_owned(), good_suffixes)
-            } else {
-                ("".to_owned(), Vec::<Modifier>::new())
-            },
-        ])
+
+        if !good_prefixes.is_empty() && !good_suffixes.is_empty() {
+            HashMap::from([
+                ("prefix".to_owned(), good_prefixes),
+                ("suffix".to_owned(), good_suffixes),
+            ])
+        } else if !good_prefixes.is_empty() {
+            HashMap::from([("prefix".to_owned(), good_prefixes)])
+        } else if !good_suffixes.is_empty() {
+            HashMap::from([("suffix".to_owned(), good_suffixes)])
+        } else {
+            HashMap::new()
+        }
+    }
+
+    /// Gets the next action expected by the item state, defaults to an empty string.
+    pub fn get_next_actions(&self) -> Vec<String> {
+        if self.has_next_action() {
+            self.next_actions.clone().unwrap()
+        } else {
+            vec![]
+        }
+    }
+
+    pub fn has_good_prefixes(&self, target: &ItemState) -> bool {
+        !Vec::from_iter(self.prefixes.clone().into_iter().filter(|prefix| {
+            target
+                .prefixes
+                .clone()
+                .into_iter()
+                .any(|target_affix| self.meets_modifier(prefix, &target_affix))
+        }))
+        .is_empty()
+    }
+
+    pub fn has_good_suffixes(&self, target: &ItemState) -> bool {
+        !Vec::from_iter(self.suffixes.clone().into_iter().filter(|suffix| {
+            target
+                .suffixes
+                .clone()
+                .into_iter()
+                .any(|target_affix| self.meets_modifier(suffix, &target_affix))
+        }))
+        .is_empty()
+    }
+
+    pub fn target_affixes(&mut self, affixes: &str) {
+        match affixes {
+            "prefix" => {
+                self.prefixes_targeted = true;
+            }
+            "suffix" => {
+                self.suffixes_targeted = true;
+            }
+            "lowest" => {
+                self.lowest_tier_targeted = true;
+            }
+            _ => {}
+        }
+    }
+
+    pub fn has_lowest_tier_targeted(&self) -> bool {
+        self.lowest_tier_targeted
+    }
+
+    pub fn target_lowest_tier(&mut self) {
+        self.lowest_tier_targeted = true;
     }
 
     pub fn has_max_prefixes(&self) -> bool {
@@ -132,5 +195,57 @@ impl ItemState {
 
     pub fn has_max_affixes(&self) -> bool {
         self.has_max_prefixes() && self.has_max_suffixes()
+    }
+
+    pub fn has_next_action(&self) -> bool {
+        self.next_actions.clone().is_some_and(|x| !x.is_empty())
+    }
+
+    pub fn set_next_action(&mut self, next_action: Option<String>) {
+        let action = next_action.unwrap_or_default();
+        // if there is no next action, there is nothing to do
+        if !action.is_empty() {
+            // if we already have next actions, add the incoming action to the list
+            // and if there was no next actions, start the action list
+            if let Some(na) = self.next_actions.as_mut() {
+                na.push(action.clone())
+            } else {
+                self.next_actions = Some(vec![action]);
+            }
+        }
+    }
+
+    pub fn has_targeted_prefixes(&self) -> bool {
+        self.prefixes_targeted
+    }
+
+    pub fn has_targeted_suffixes(&self) -> bool {
+        self.suffixes_targeted
+    }
+
+    pub fn has_targeted_lowest_tier(&self) -> bool {
+        self.lowest_tier_targeted
+    }
+
+    pub fn clear_affix_target(&mut self, affix: String) {
+        if affix.eq("prefix") {
+            self.prefixes_targeted = false;
+        } else {
+            self.suffixes_targeted = false;
+        }
+    }
+
+    pub fn clear_next_action(&mut self, action: String) {
+        if let Some(na) = self.next_actions.as_mut() {
+            if let Some(index) = na.iter().position(|a| a.eq(&action)) {
+                na.swap_remove(index);
+            }
+        }
+    }
+
+    pub fn get_affix_count(&self) -> u16 {
+        (self.prefixes.len() + self.suffixes.len())
+            .try_into()
+            .expect("could not get item's affix count as an unsigned 16-bit integer.")
     }
 }

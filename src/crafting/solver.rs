@@ -1,7 +1,8 @@
 use crate::{
     crafting::crafter::Crafter,
     datasets::{
-        class_tiers::ClassTiers, craft_actions::CraftActions, items::Items, modifiers::Modifiers,
+        class_tiers::ClassTiers, craft_action::CraftAction, craft_actions::CraftActions,
+        items::Items, modifiers::Modifiers,
     },
     files::from_file::FromFile,
     items::item_state::ItemState,
@@ -71,47 +72,37 @@ impl Solver {
                     for _ in 0..steps_per_run {
                         let good_modifiers = crafted_item.get_good_modifiers(target_state);
                         let good_actions = if !good_modifiers.is_empty() {
-                            self.craft_actions.get_actions_except(
-                                vec!["remove".to_owned(), "replace".to_owned()].as_slice(),
-                                &good_modifiers
-                                    .into_iter()
-                                    .map(|gm| gm.0)
-                                    .collect::<Vec<String>>(),
-                            )
+                            self.craft_actions
+                                .get_actions_except(
+                                    vec!["remove".to_owned(), "replace".to_owned()].as_slice(),
+                                    &good_modifiers
+                                        .iter()
+                                        .map(|gm| gm.0.to_string())
+                                        .collect::<Vec<String>>(),
+                                )
+                                .into_iter()
+                                .filter(|ca| self.is_valid_crafting_action(ca, &crafted_item))
+                                .collect::<Vec<CraftAction>>()
                         } else {
                             self.craft_actions
                                 .craft_actions
                                 .clone()
                                 .into_iter()
+                                .filter(|ca| self.is_valid_crafting_action(ca, &crafted_item))
                                 .collect()
                         };
 
-                        let valid_actions = good_actions
+                        let good_action_ids = good_actions
                             .iter()
-                            .filter(|ca| {
-                                if (ca.adds_prefix() && crafted_item.has_max_prefixes())
-                                    || (ca.adds_suffix() && crafted_item.has_max_suffixes())
-                                    || (ca.adds_affix() && crafted_item.has_max_affixes())
-                                    || (ca.removes_prefix() && crafted_item.has_no_prefixes())
-                                    || (ca.removes_suffix() && crafted_item.has_no_suffixes())
-                                    || (ca.removes_affix() && crafted_item.has_no_affixes())
-                                {
-                                    false
-                                } else if ca.rarity.is_some() {
-                                    ca.rarity.clone().unwrap().eq(&crafted_item.rarity)
-                                } else {
-                                    true
-                                }
-                            })
                             .map(|ca| ca.id.to_owned())
                             .collect::<Vec<_>>();
 
-                        if valid_actions.is_empty() {
+                        if good_action_ids.is_empty() {
                             log_debug!("can't find any good crafting actions!");
                             break;
                         }
 
-                        let action_id = valid_actions.choose(&mut rng).unwrap();
+                        let action_id = good_action_ids.choose(&mut rng).unwrap();
                         self.apply_crafting_action(&mut crafted_item, action_id);
                         current_cost +=
                             self.craft_actions.get_action_by_id(action_id).unwrap().cost;
@@ -134,6 +125,9 @@ impl Solver {
                             }
                             break;
                         }
+
+                        // clear out any actions from the crafted item's target
+                        self.reset_item_target_action(&mut crafted_item, action_id);
                     }
 
                     log_debug!(
@@ -188,14 +182,16 @@ impl Solver {
                         log_debug!("couldn't find a good \"add\" outcome!");
                         break;
                     }
-                    self.add_random_affix(
+                    if self.add_random_affix(
                         &self.items.items,
                         &self.class_tiers.class_tiers,
                         &self.modifiers,
                         item_state,
                         outcome_affix,
                         1,
-                    );
+                    ) {
+                        item_state.clear_affix_target(outcome_affix.to_owned());
+                    }
                 }
             }
             "remove" => {
@@ -205,7 +201,9 @@ impl Solver {
                         log_debug!("couldn't find a good \"remove\" outcome!");
                         break;
                     }
-                    self.remove_random_affix(item_state, outcome_affix, 1);
+                    if self.remove_random_affix(item_state, outcome_affix, 1) {
+                        item_state.clear_affix_target(outcome_affix.to_owned());
+                    }
                 }
             }
             "replace" => {
@@ -219,20 +217,34 @@ impl Solver {
                     target_affix,
                     1,
                 );
+                item_state.clear_affix_target(target_affix.to_owned());
+            }
+            "target" => {
+                if action.targets_lowest_tier() {
+                    item_state.target_lowest_tier();
+                }
+                if action.targets_affix() {
+                    item_state.target_affixes(&outcome.affix);
+                }
+                item_state.set_next_action(action.currency);
             }
             _ => log_debug!("Unknown action type: {}", outcome.action),
         }
 
         // Update rarity based on the new number of affixes
         let num_affixes = item_state.prefixes.len() + item_state.suffixes.len();
-        item_state.rarity =
-            if num_affixes == 0 && item_state.rarity != "magic" && item_state.rarity != "rare" {
+        if !item_state.rarity.eq("rare") {
+            item_state.rarity = if num_affixes == 0 && !item_state.rarity.eq("magic") {
                 "normal".to_owned()
-            } else if (1..=2).contains(&num_affixes) && item_state.rarity == "normal" {
+            } else if num_affixes >= 3 || action_id.eq("regal") {
+                "rare".to_owned()
+            } else if num_affixes > 0 && num_affixes < 3 {
                 "magic".to_owned()
             } else {
-                "rare".to_owned()
+                item_state.rarity.to_owned()
             };
+            log_debug!("updated item rarity to {}", item_state.rarity);
+        }
     }
 }
 

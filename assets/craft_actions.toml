@@ -1,30 +1,24 @@
 craft_actions = [
-    { name = "exalted orb", id = "exalt", cost = 1.0, rarity = "rare", outcomes = [
-        { action = "add", affix = "prefix", probability = 0.5 },
-        { action = "add", affix = "suffix", probability = 0.5 }
+    { name = "exalted orb", id = "exalt", cost = 1.0, rarity = "rare", outcomes = [{ action = "add", affix = "random", probability = 1.0 }]},
+    { name = "orb of transmutation", id = "transmute", cost = 0.01, rarity = "normal", outcomes = [{ action = "add", affix = "random", probability = 1.0 }]},
+    { name = "orb of alteration", id = "alteration", cost = 0.01, rarity = "magic", outcomes = [{ action = "add", affix = "random", probability = 1.0 }]},
+    { name = "chaos orb", id = "chaos", cost = 10.0, rarity = "rare", outcomes = [{ action = "replace", affix = "random", probability = 1.0 }]},
+    { name = "regal orb", id = "regal", cost = 0.1, rarity = "magic", outcomes = [{ action = "add", affix = "random", probability = 1.0 }]},
+    { name = "alchemy orb", id = "alchemy", cost = 0.05, rarity = "normal", outcomes = [{ action = "add", affix = "random", count = 4, probability = 1.0 }]},
+    { name = "orb of annulment", id = "annul", cost = 100.0, outcomes = [{ action = "remove", affix = "random", probability = 1.0 }]},
+    { name = "omen of dextral annulment", id = "dextral-annul", currency = "annul", cost = 1000.0, rarity = "rare", outcomes = [
+        { action = "target", affix = "suffix", probability = 1.0 },
     ]},
-    { name = "orb of transmutation", id = "transmute", cost = 0.01, rarity = "normal", outcomes = [
-        { action = "add", affix = "prefix", probability = 0.5 },
-        { action = "add", affix = "suffix", probability = 0.5 },
+    { name = "omen of sinistral annulment", id = "sinistral-annul", currency = "annul", cost = 1000.0, rarity = "rare", outcomes = [
+        { action = "target", affix = "prefix", probability = 1.0 },
     ]},
-    { name = "orb of alteration", id = "alteration", cost = 0.01, rarity = "magic", outcomes = [
-        { action = "add", affix = "prefix", probability = 0.5 },
-        { action = "add", affix = "suffix", probability = 0.5 },
+    { name = "omen of dextral erasure", id = "dextral-erasure", currency = "chaos", cost = 1000.0, rarity = "rare", outcomes = [
+        { action = "target", affix = "prefix", probability = 1.0 },
     ]},
-    { name = "chaos orb", id = "chaos", cost = 10.0, rarity = "rare", outcomes = [
-        { action = "replace", affix = "prefix", probability = 0.5 },
-        { action = "replace", affix = "suffix", probability = 0.5 },
+    { name = "omen of sinistral erasure", id = "sinistral-erasure", currency = "chaos", cost = 1000.0, rarity = "rare", outcomes = [
+        { action = "target", affix = "prefix", probability = 1.0 },
     ]},
-    { name = "regal orb", id = "regal", cost = 0.1, rarity = "magic", outcomes = [
-        { action = "add", affix = "prefix", probability = 0.5 },
-        { action = "add", affix = "suffix", probability = 0.5 },
+    { name = "omen of whittling", id = "whittle", currency = "chaos", cost = 1000.0, rarity = "rare", outcomes = [
+        { action = "target", affix = "lowest", probability = 1.0 },
     ]},
-    { name = "alchemy orb", id = "alchemy", cost = 0.05, rarity = "normal", outcomes = [
-        { action = "add", affix = "random", count = 4, probability = 1.0 },
-    ]},
-    { name = "orb of annulment", id = "annul", cost = 100.0, outcomes = [
-        { action = "remove", affix = "prefix", probability = 0.5 },
-        { action = "remove", affix = "suffix", probability = 0.5 },
-    ]},
-    # { name = "omen of dextral annulment", id = "dextral-annul", cost = 1000.0, rarity = "rare", outcomes = [{ action = "remove", affix = "suffix", probability = 1.0 }]},
 ]
