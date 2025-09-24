@@ -6,19 +6,9 @@ craft_actions = [
     { name = "regal orb", id = "regal", cost = 0.1, rarity = "magic", outcomes = [{ action = "add", affix = "random", probability = 1.0 }]},
     { name = "alchemy orb", id = "alchemy", cost = 0.05, rarity = "normal", outcomes = [{ action = "add", affix = "random", count = 4, probability = 1.0 }]},
     { name = "orb of annulment", id = "annul", cost = 100.0, outcomes = [{ action = "remove", affix = "random", probability = 1.0 }]},
-    { name = "omen of dextral annulment", id = "dextral-annul", currency = "annul", cost = 1000.0, rarity = "rare", outcomes = [
-        { action = "target", affix = "suffix", probability = 1.0 },
-    ]},
-    { name = "omen of sinistral annulment", id = "sinistral-annul", currency = "annul", cost = 1000.0, rarity = "rare", outcomes = [
-        { action = "target", affix = "prefix", probability = 1.0 },
-    ]},
-    { name = "omen of dextral erasure", id = "dextral-erasure", currency = "chaos", cost = 1000.0, rarity = "rare", outcomes = [
-        { action = "target", affix = "prefix", probability = 1.0 },
-    ]},
-    { name = "omen of sinistral erasure", id = "sinistral-erasure", currency = "chaos", cost = 1000.0, rarity = "rare", outcomes = [
-        { action = "target", affix = "prefix", probability = 1.0 },
-    ]},
-    { name = "omen of whittling", id = "whittle", currency = "chaos", cost = 1000.0, rarity = "rare", outcomes = [
-        { action = "target", affix = "lowest", probability = 1.0 },
-    ]},
+    { name = "omen of dextral annulment", id = "dextral-annul", currency = "annul", cost = 1000.0, rarity = "rare", outcomes = [{ action = "target", affix = "suffix", probability = 1.0 }]},
+    { name = "omen of sinistral annulment", id = "sinistral-annul", currency = "annul", cost = 1000.0, rarity = "rare", outcomes = [{ action = "target", affix = "prefix", probability = 1.0 }]},
+    { name = "omen of dextral erasure", id = "dextral-erasure", currency = "chaos", cost = 1000.0, rarity = "rare", outcomes = [{ action = "target", affix = "prefix", probability = 1.0 }]},
+    { name = "omen of sinistral erasure", id = "sinistral-erasure", currency = "chaos", cost = 1000.0, rarity = "rare", outcomes = [{ action = "target", affix = "prefix", probability = 1.0 }]},
+    { name = "omen of whittling", id = "whittle", currency = "chaos", cost = 1000.0, rarity = "rare", outcomes = [{ action = "target", affix = "lowest", probability = 1.0 }]},
 ]

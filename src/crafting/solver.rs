@@ -2,7 +2,7 @@ use crate::{
     crafting::crafter::Crafter,
     datasets::{
         class_tiers::ClassTiers, craft_action::CraftAction, craft_actions::CraftActions,
-        items::Items, modifiers::Modifiers,
+        craft_outcome::CraftOutcome, items::Items, modifiers::Modifiers,
     },
     files::from_file::FromFile,
     items::item_state::ItemState,
@@ -40,19 +40,21 @@ impl Solver {
     /// Simulates attaining the `target_state` over an amount of `runs`, and
     /// reports the results.
     pub fn simulate(&self, target_state: &ItemState, runs: u32, steps_per_run: u32) {
-        // Wrap shared state in Arc and Mutex to allow safe, multi-threaded access.
+        // wrap shared state in Arc and Mutex to allow safe, multi-threaded access
         let best_cost = Arc::new(Mutex::new(f32::MAX));
         let best_sequence = Arc::new(Mutex::new(vec![]));
 
         let simulation_start = Instant::now();
         log_info!("starting simulation ({runs} runs) to find the best crafting sequence.");
 
+        // create a thread scope to spawn a thread for each simulation
         thread::scope(|s| {
             for i in 0..runs {
-                // Clone the Arcs for each new thread. This is a cheap operation.
+                // clone the Arcs for each new thread; this is a cheap operation
                 let best_cost_clone = Arc::clone(&best_cost);
                 let best_sequence_clone = Arc::clone(&best_sequence);
 
+                // spawn a thread in main thread scope for each run
                 s.spawn(move || {
                     let run_start = Instant::now();
                     log_debug!("starting run {i}.");
@@ -69,33 +71,11 @@ impl Solver {
                     let mut sequence: Vec<String> = Vec::new();
 
                     let mut rng = rand::rng();
-                    for _ in 0..steps_per_run {
-                        let good_modifiers = crafted_item.get_good_modifiers(target_state);
-                        let good_actions = if !good_modifiers.is_empty() {
-                            self.craft_actions
-                                .get_actions_except(
-                                    vec!["remove".to_owned(), "replace".to_owned()].as_slice(),
-                                    &good_modifiers
-                                        .iter()
-                                        .map(|gm| gm.0.to_string())
-                                        .collect::<Vec<String>>(),
-                                )
-                                .into_iter()
-                                .filter(|ca| self.is_valid_crafting_action(ca, &crafted_item))
-                                .collect::<Vec<CraftAction>>()
-                        } else {
-                            self.craft_actions
-                                .craft_actions
-                                .clone()
-                                .into_iter()
-                                .filter(|ca| self.is_valid_crafting_action(ca, &crafted_item))
-                                .collect()
-                        };
 
-                        let good_action_ids = good_actions
-                            .iter()
-                            .map(|ca| ca.id.to_owned())
-                            .collect::<Vec<_>>();
+                    // apply `steps_per_run` amount of crafts for each run
+                    for _ in 0..steps_per_run {
+                        let good_action_ids =
+                            self.get_crafting_actions(target_state, &crafted_item);
 
                         if good_action_ids.is_empty() {
                             log_debug!("can't find any good crafting actions!");
@@ -109,7 +89,7 @@ impl Solver {
                         sequence.push(action_id.clone());
 
                         if crafted_item.meets_target(target_state) {
-                            // Lock the mutex to safely access and modify the shared state.
+                            // lock the mutex to safely access and modify the shared state.
                             let mut locked_cost = best_cost_clone.lock().unwrap();
                             if current_cost < *locked_cost {
                                 let mut locked_sequence = best_sequence_clone.lock().unwrap();
@@ -132,7 +112,7 @@ impl Solver {
 
                     log_debug!(
                         "finished run {} ({:.2}s)",
-                        i,
+                        i + 1,
                         run_start.elapsed().as_secs_f32()
                     );
                 });
@@ -157,13 +137,14 @@ impl Solver {
 
     /// Applies a crafting action to an item.
     fn apply_crafting_action(&self, item_state: &mut ItemState, action_id: &str) {
+        // get the crafting action by id
         let action = self
             .craft_actions
             .get_action_by_id(action_id)
             .expect("Unknown crafting action");
-
         log_debug!("using '{}'...", action.name);
 
+        // get an outcome from the crafting action
         let mut rng = rand::rng();
         let dist = WeightedIndex::new(
             action
@@ -174,6 +155,21 @@ impl Solver {
         )
         .expect("Could not distribute modifier weights.");
         let outcome = &action.outcomes[dist.sample(&mut rng)];
+
+        // apply the outcome to the item
+        self.apply_outcome_to_item(&action, outcome, item_state);
+
+        // Update rarity based on the new number of affixes
+        self.update_item_rarity(item_state, action_id);
+    }
+
+    /// Applies a [`CraftOutcome`] to an [`ItemState`].
+    fn apply_outcome_to_item(
+        &self,
+        action: &CraftAction,
+        outcome: &CraftOutcome,
+        item_state: &mut ItemState,
+    ) {
         match outcome.action.as_str() {
             "add" => {
                 for _ in 0..outcome.count.unwrap_or(1) {
@@ -226,12 +222,14 @@ impl Solver {
                 if action.targets_affix() {
                     item_state.target_affixes(&outcome.affix);
                 }
-                item_state.set_next_action(action.currency);
+                item_state.set_next_action(action.currency.clone());
             }
             _ => log_debug!("Unknown action type: {}", outcome.action),
         }
+    }
 
-        // Update rarity based on the new number of affixes
+    /// Updates [`ItemState::rarity`].
+    fn update_item_rarity(&self, item_state: &mut ItemState, action_id: &str) {
         let num_affixes = item_state.prefixes.len() + item_state.suffixes.len();
         if !item_state.rarity.eq("rare") {
             item_state.rarity = if num_affixes == 0 && !item_state.rarity.eq("magic") {
@@ -245,6 +243,41 @@ impl Solver {
             };
             log_debug!("updated item rarity to {}", item_state.rarity);
         }
+    }
+
+    /// Gets a collection of "good" crafting action ids based on `crafted_item`
+    /// and `target_state`.
+    fn get_crafting_actions(
+        &self,
+        target_state: &ItemState,
+        crafted_item: &ItemState,
+    ) -> Vec<String> {
+        let good_modifiers = crafted_item.get_good_modifiers(target_state);
+        let good_actions = if !good_modifiers.is_empty() {
+            self.craft_actions
+                .get_actions_except(
+                    vec!["remove".to_owned(), "replace".to_owned()].as_slice(),
+                    &good_modifiers
+                        .iter()
+                        .map(|gm| gm.0.to_string())
+                        .collect::<Vec<String>>(),
+                )
+                .into_iter()
+                .filter(|ca| self.is_valid_crafting_action(ca, crafted_item))
+                .collect::<Vec<CraftAction>>()
+        } else {
+            self.craft_actions
+                .craft_actions
+                .clone()
+                .into_iter()
+                .filter(|ca| self.is_valid_crafting_action(ca, crafted_item))
+                .collect()
+        };
+
+        good_actions
+            .iter()
+            .map(|ca| ca.id.to_owned())
+            .collect::<Vec<_>>()
     }
 }
 

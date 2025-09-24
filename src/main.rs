@@ -24,5 +24,5 @@ fn main() {
     );
 
     // run the simulation
-    solver.simulate(&target_state, 5000, 20);
+    solver.simulate(&target_state, 15000, 20);
 }
