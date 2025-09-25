@@ -35,3 +35,8 @@ pub mod items {
     pub mod item_state;
     pub mod modifier;
 }
+
+/// Contains all random-related behaviors.
+pub mod random {
+    pub mod randomizer;
+}

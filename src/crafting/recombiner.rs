@@ -1,12 +1,55 @@
+use rand::Rng;
+
 use crate::{
     datasets::class_tier::ClassTier,
     items::{item_state::ItemState, modifier::Modifier},
+    random::randomizer,
 };
 
 /// Responsible for all item combination actions.
 pub trait Recombiner {
+    /// Gets the amount of recombine modifiers based on `modifier_count`.
+    fn get_amount_of_modifers(&self, modifier_count: u8) -> u8 {
+        match modifier_count {
+            1 => randomizer::if_more_than(41.0, 1, 0),
+            2 => randomizer::if_more_than(66.7, 2, 1),
+            3 => randomizer::if_more_than(90.0, 3, randomizer::if_more_than(50.0, 2, 1)),
+            4 => randomizer::if_more_than(70.0, 3, randomizer::if_more_than(60.0, 2, 1)),
+            5 => randomizer::if_more_than(43.0, 3, 2),
+            6 => randomizer::if_more_than(30.0, 3, 2),
+            _ => 0,
+        }
+    }
+
+    fn pick_from_selected_modifiers(
+        &self,
+        modifier_count: u8,
+        prefixes: &[Modifier],
+        suffixes: &[Modifier],
+    ) -> Vec<Modifier> {
+        let affix = if rand::rng().random_bool(0.5) {
+            "prefix"
+        } else {
+            "suffix"
+        };
+
+        let mut modifiers_picked: i16 = -1;
+        (0..modifier_count)
+            .map(|i| {
+                modifiers_picked += 1;
+                if (affix.eq("prefix") && i < prefixes.len() as u8)
+                    || (affix.eq("suffix") && i >= suffixes.len() as u8 && i < prefixes.len() as u8)
+                {
+                    prefixes[modifiers_picked as usize].clone()
+                } else {
+                    suffixes[modifiers_picked as usize].clone()
+                }
+            })
+            .collect::<Vec<Modifier>>()
+    }
+
     /// Selects a base from two items of the same class.
-    fn select_item(
+    fn select_recombine_item(
         &self,
         left_item: &ItemState,
         right_item: &ItemState,
@@ -30,7 +73,7 @@ pub trait Recombiner {
     }
 
     /// Calculates a "success chance" of combining items.
-    fn calculate_success_chance(
+    fn get_modifier_recombine_chance(
         &self,
         base_type: &ClassTier,
         item_level: u8,

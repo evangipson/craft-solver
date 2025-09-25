@@ -7,6 +7,7 @@ use crate::{
     },
     files::from_file::FromFile,
     items::{item_state::ItemState, modifier::Modifier},
+    random::randomizer,
 };
 use logger::{log_debug, log_info};
 use rand::distr::weighted::WeightedIndex;
@@ -144,20 +145,81 @@ impl Solver {
         left_mods: Vec<Modifier>,
         right_mods: Vec<Modifier>,
     ) -> ItemState {
-        let base_item = self.select_item(left_item, right_item, &left_mods, &right_mods);
+        let base_item = self.select_recombine_item(left_item, right_item, &left_mods, &right_mods);
         let all_mods = [left_mods.as_slice(), right_mods.as_slice()].concat();
         let class_tiers = self.get_class_tiers_for_item(&base_item).expect(
             "cannot find class tiers for the selected item, check the class_tiers.toml file!",
         );
 
-        all_mods.iter().for_each(|m| {
-            log_info!(
-                "while recombining... success chance for tier {} {} is {:.2}%",
-                m.tier,
-                m.id,
-                self.calculate_success_chance(class_tiers, base_item.item_level, &m.id, 1, m.tier)
-            );
-        });
+        // let amount_of_modifiers = self.get_amount_of_modifers(all_mods.len().try_into().unwrap());
+        // log_info!(
+        //     "{amount_of_modifiers} modifiers chosen out of {} total mods.",
+        //     all_mods.len()
+        // );
+
+        let left_prefixes = left_item
+            .prefixes
+            .clone()
+            .into_iter()
+            .filter(|p| left_mods.iter().any(|m| m.id.eq(&p.id)))
+            .collect::<Vec<Modifier>>();
+        let left_suffixes = left_item
+            .suffixes
+            .clone()
+            .into_iter()
+            .filter(|p| left_mods.iter().any(|m| m.id.eq(&p.id)))
+            .collect::<Vec<Modifier>>();
+        let right_prefixes = right_item
+            .prefixes
+            .clone()
+            .into_iter()
+            .filter(|p| right_mods.iter().any(|m| m.id.eq(&p.id)))
+            .collect::<Vec<Modifier>>();
+        let right_suffixes = right_item
+            .suffixes
+            .clone()
+            .into_iter()
+            .filter(|p| right_mods.iter().any(|m| m.id.eq(&p.id)))
+            .collect::<Vec<Modifier>>();
+
+        let prefixes = [left_prefixes.as_slice(), right_prefixes.as_slice()].concat();
+        let suffixes = [left_suffixes.as_slice(), right_suffixes.as_slice()].concat();
+
+        let modifiers =
+            self.pick_from_selected_modifiers(all_mods.len() as u8, &prefixes, &suffixes);
+
+        log_info!(
+            "modifiers selected:\n{}",
+            modifiers
+                .iter()
+                .map(|m| format!("{} (tier {})", m.id, m.tier))
+                .collect::<Vec<String>>()
+                .join("\n")
+        );
+
+        let success_chance = modifiers
+            .iter()
+            .map(|m| {
+                self.get_modifier_recombine_chance(
+                    class_tiers,
+                    base_item.item_level,
+                    &m.id,
+                    1,
+                    m.tier,
+                )
+            })
+            .sum::<f32>();
+
+        log_info!(
+            "while recombining, success chance is {:.2}%",
+            success_chance
+        );
+
+        if randomizer::if_more_than(success_chance, false, true) {
+            log_info!("recombining succeeded!");
+        } else {
+            log_info!("recombining failed.");
+        }
 
         base_item
     }
