@@ -36,14 +36,8 @@ fn main() {
         vec![Modifier::from_tier(&solver, "cold-res", 2)],
     );
 
-    let left_mods = vec![
-        Modifier::from_value(&solver, "max-life", 180),
-        Modifier::from_tier(&solver, "chaos-res", 1),
-    ];
-    let right_mods = vec![
-        Modifier::from_value(&solver, "armor", 100),
-        Modifier::from_tier(&solver, "cold-res", 2),
-    ];
+    let left_mods = vec![Modifier::from_value(&solver, "max-life", 180)];
+    let right_mods = vec![Modifier::from_value(&solver, "armor", 100)];
 
     solver.recombine(&target_state, &right_item, left_mods, right_mods);
     // ===========================

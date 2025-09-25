@@ -200,13 +200,7 @@ impl Solver {
         let success_chance = modifiers
             .iter()
             .map(|m| {
-                self.get_modifier_recombine_chance(
-                    class_tiers,
-                    base_item.item_level,
-                    &m.id,
-                    1,
-                    m.tier,
-                )
+                self.get_modifier_recombine_chance(class_tiers, base_item.item_level, &m.id, m.tier)
             })
             .sum::<f32>();
 

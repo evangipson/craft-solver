@@ -33,16 +33,18 @@ pub trait Recombiner {
             "suffix"
         };
 
-        let mut modifiers_picked: i16 = -1;
+        let mut prefixes_picked: i16 = -1;
+        let mut suffixes_picked: i16 = -1;
         (0..modifier_count)
-            .map(|i| {
-                modifiers_picked += 1;
-                if (affix.eq("prefix") && i < prefixes.len() as u8)
-                    || (affix.eq("suffix") && i >= suffixes.len() as u8 && i < prefixes.len() as u8)
+            .map(|_| {
+                if (affix.eq("prefix") && prefixes_picked < (prefixes.len() - 1) as i16)
+                    || (affix.eq("suffix") && suffixes_picked >= (suffixes.len() - 1) as i16)
                 {
-                    prefixes[modifiers_picked as usize].clone()
+                    prefixes_picked += 1;
+                    prefixes[prefixes_picked as usize].clone()
                 } else {
-                    suffixes[modifiers_picked as usize].clone()
+                    suffixes_picked += 1;
+                    suffixes[suffixes_picked as usize].clone()
                 }
             })
             .collect::<Vec<Modifier>>()
@@ -78,7 +80,6 @@ pub trait Recombiner {
         base_type: &ClassTier,
         item_level: u8,
         affix_id: &str,
-        coefficient: u32,
         target_tier: u8,
     ) -> f32 {
         // find the total weight of all mods for the item level
@@ -98,7 +99,16 @@ pub trait Recombiner {
             .map(|tier| base_type.get_weight_of_tier(affix_id, tier) as u32)
             .sum();
 
+        // chests get a 5x coefficient, spears get an 8x, everything else does not
+        let coefficient = if base_type.classes.contains(&"chest".to_owned()) {
+            5
+        } else if base_type.classes.contains(&"spear".to_owned()) {
+            8
+        } else {
+            1
+        };
+
         // return the percent chance of the recombination
-        ((coefficient * sum_of_weights) as f32 / total_weight as f32) * 100.0
+        (coefficient * sum_of_weights) as f32 / total_weight as f32
     }
 }
