@@ -14,6 +14,7 @@ fn main() {
     // define the end state
     let target_state = ItemState::new(
         "Warlord Cuirass",
+        "chest",
         "rare",
         82,
         vec![Modifier::from_value(&solver, "max-life", 180)],
@@ -23,6 +24,29 @@ fn main() {
         ],
     );
 
+    // =======================
+    // TEST RECOMBINATOR STUFF
+    // =======================
+    let right_item = ItemState::new(
+        "Warlord Cuirass",
+        "chest",
+        "rare",
+        82,
+        vec![Modifier::from_value(&solver, "armor", 100)],
+        vec![Modifier::from_tier(&solver, "cold-res", 2)],
+    );
+
+    let left_mods = vec![Modifier::from_value(&solver, "max-life", 180)];
+    let right_mods = vec![
+        Modifier::from_value(&solver, "armor", 100),
+        Modifier::from_tier(&solver, "cold-res", 2),
+    ];
+
+    solver.recombine(&target_state, &right_item, left_mods, right_mods);
+    // ===========================
+    // END TEST RECOMBINATOR STUFF
+    // ===========================
+
     // run the simulation
-    solver.simulate(&target_state, 15000, 20);
+    solver.simulate(&target_state, 100, 20);
 }

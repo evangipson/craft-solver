@@ -7,6 +7,7 @@ use logger::log_info;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ItemState {
     pub base: String,
+    pub class: String,
     pub rarity: String,
     pub max_prefixes: u8,
     pub max_suffixes: u8,
@@ -24,6 +25,7 @@ impl ItemState {
     /// Makes a new [`ItemState`].
     pub fn new(
         base: &str,
+        class: &str,
         rarity: &str,
         item_level: u8,
         prefixes: Vec<Modifier>,
@@ -31,6 +33,7 @@ impl ItemState {
     ) -> Self {
         Self {
             base: base.to_owned(),
+            class: class.to_owned(),
             rarity: rarity.to_owned(),
             max_prefixes: 3,
             max_suffixes: 3,

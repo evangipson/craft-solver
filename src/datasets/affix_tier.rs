@@ -10,8 +10,26 @@ pub struct AffixTier {
 
 impl AffixTier {
     /// Gets the weight of all tiers for an affix.
-    pub fn get_tier_weight(&self) -> u16 {
+    pub fn get_all_tiers_weight(&self) -> u16 {
         self.tiers.iter().map(|t| t.weight).sum()
+    }
+
+    /// Gets the highest possible tier for an item level.
+    pub fn get_highest_tier_for_item_level(&self, item_level: u8) -> u8 {
+        self.tiers
+            .iter()
+            .map(|t| t.item_level)
+            .find(|ilvl| ilvl <= &item_level)
+            .unwrap_or_default()
+    }
+
+    /// Gets a specific tier's weight for an affix.
+    pub fn get_tier_weight(&self, tier: u8) -> Option<u16> {
+        if tier >= self.tiers.len() as u8 {
+            None
+        } else {
+            Some(self.tiers[tier as usize].weight)
+        }
     }
 
     /// Gets the minimum value for an affix modifier by `tier`.

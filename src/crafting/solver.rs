@@ -1,11 +1,12 @@
 use crate::{
-    crafting::crafter::Crafter,
+    crafting::{crafter::Crafter, recombiner::Recombiner},
     datasets::{
-        class_tiers::ClassTiers, craft_action::CraftAction, craft_actions::CraftActions,
-        craft_outcome::CraftOutcome, items::Items, modifiers::Modifiers,
+        class_tier::ClassTier, class_tiers::ClassTiers, craft_action::CraftAction,
+        craft_actions::CraftActions, craft_outcome::CraftOutcome, items::Items,
+        modifiers::Modifiers,
     },
     files::from_file::FromFile,
-    items::item_state::ItemState,
+    items::{item_state::ItemState, modifier::Modifier},
 };
 use logger::{log_debug, log_info};
 use rand::distr::weighted::WeightedIndex;
@@ -61,6 +62,7 @@ impl Solver {
 
                     let mut crafted_item = ItemState::new(
                         &target_state.base,
+                        &target_state.class,
                         "normal",
                         target_state.item_level,
                         vec![],
@@ -133,6 +135,31 @@ impl Solver {
             log_info!("optimal sequence found: {:?}", *final_best_sequence);
             log_info!("total cost: ~{:.2} exalted orbs", *final_best_cost);
         }
+    }
+
+    pub fn recombine(
+        &self,
+        left_item: &ItemState,
+        right_item: &ItemState,
+        left_mods: Vec<Modifier>,
+        right_mods: Vec<Modifier>,
+    ) -> ItemState {
+        let base_item = self.select_item(left_item, right_item, &left_mods, &right_mods);
+        let all_mods = [left_mods.as_slice(), right_mods.as_slice()].concat();
+        let class_tiers = self.get_class_tiers_for_item(&base_item).expect(
+            "cannot find class tiers for the selected item, check the class_tiers.toml file!",
+        );
+
+        all_mods.iter().for_each(|m| {
+            log_info!(
+                "while recombining... success chance for tier {} {} is {:.2}%",
+                m.tier,
+                m.id,
+                self.calculate_success_chance(class_tiers, base_item.item_level, &m.id, 1, m.tier)
+            );
+        });
+
+        base_item
     }
 
     /// Applies a crafting action to an item.
@@ -279,6 +306,16 @@ impl Solver {
             .map(|ca| ca.id.to_owned())
             .collect::<Vec<_>>()
     }
+
+    /// Gets all tiers of modifiers for an `item_state`, using it's base class.
+    fn get_class_tiers_for_item(&self, item_state: &ItemState) -> Option<&ClassTier> {
+        self.class_tiers
+            .class_tiers
+            .iter()
+            .find(|ct| ct.classes.contains(&item_state.class))
+    }
 }
 
 impl Crafter for Solver {}
+
+impl Recombiner for Solver {}

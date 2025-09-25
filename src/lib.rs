@@ -2,6 +2,7 @@
 pub mod crafting {
     pub mod affix_candidate;
     pub mod crafter;
+    pub mod recombiner;
     pub mod solver;
 }
 

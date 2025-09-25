@@ -114,6 +114,7 @@ pub trait Crafter {
             id: chosen_modifier_from_db.id.clone(),
             tier: (chosen_tier_index + 1) as u8,
             value: chosen_tier_value as u16,
+            weight: chosen_tier.weight,
         })
     }
 
@@ -266,6 +267,16 @@ pub trait Crafter {
             .flat_map(|ct| [ct.prefixes.as_slice(), ct.suffixes.as_slice()].concat())
             .find(|a| a.affix.eq(&affix))
             .map(|a| a.get_value_tier(value).unwrap_or_default())
+            .unwrap_or_default()
+    }
+
+    /// Gets the weight for an `affix` `tier`.
+    fn get_affix_tier_weight(&self, class_tiers: &[ClassTier], affix: String, tier: u8) -> u16 {
+        class_tiers
+            .iter()
+            .flat_map(|ct| [ct.prefixes.as_slice(), ct.suffixes.as_slice()].concat())
+            .find(|a| a.affix.eq(&affix))
+            .map(|a| a.get_tier_weight(tier).unwrap_or_default())
             .unwrap_or_default()
     }
 
